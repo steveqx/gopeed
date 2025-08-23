@@ -1,20 +1,6 @@
 name: build-web
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - "bind/**"
-      - "cmd/**"
-      - "internal/**"
-      - "pkg/**"
-      - "ui/**"
-      - ".github/workflows/release.yml"
-      - ".github/release-drafter.yml"
-      - "go.mod"
-      - "go.sum"
-      - "Dockerfile"
+on: workflow_dispatch
 
 env:
   GO_VERSION: "1.24"

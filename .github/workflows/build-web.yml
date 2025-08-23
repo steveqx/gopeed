@@ -1,0 +1,62 @@
+name: build-web
+
+
+env:
+  GO_VERSION: "1.24"
+  FLUTTER_VERSION: "3.24.5"
+
+permissions:
+  contents: write
+
+jobs:
+  get-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-release.outputs.version }}
+      upload_url: ${{ steps.get-release.outputs.upload_url }}
+
+    steps:
+      - uses: monkeyWie/get-latest-release@v2.1
+        id: get-release
+        with:
+          myToken: ${{ github.token }}
+
+  build-web:
+    runs-on: ubuntu-latest
+    needs: [get-release]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Build
+        env:
+          VERSION: ${{ needs.get-release.outputs.version }}
+        run: |
+          cd ui/flutter
+          flutter build web --no-web-resources-cdn
+          cd ../../
+          cp -r ui/flutter/build/web cmd/web/dist
+          mkdir -p dist/zip
+          export CGO_ENABLED=0
+          goarm_arr=(5 6 7)
+          for goarm in "${goarm_arr[@]}"; do
+              name=gopeed-web-v$VERSION-linux-armv$goarm
+              dir="dist/$name/"
+              (GOOS=linux GOARCH=arm GOARM=$goarm go build -tags nosqlite,web -ldflags="-s -w -X github.com/GopeedLab/gopeed/pkg/base.Version=$VERSION" -o $dir github.com/GopeedLab/gopeed/cmd/web \
+              && cd $dir \
+              && file=$(ls -AU | head -1) \
+              && mkdir $name \
+              && mv $file $name/$(echo $file | sed -e "s/web/gopeed/g") \
+              && zip -r ../zip/$name.zip * \
+              && cd ../..) \
+              || true
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/zip/
+
